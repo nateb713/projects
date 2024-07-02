@@ -1,0 +1,105 @@
+#!/bin/csh
+
+set nonomatch #This is dumb. Why does this have to be explicitly said?
+echo "subject name"
+set sub=$< 
+echo "session"
+set ses=$<
+
+echo $sub
+echo $ses
+cd '/mnt/acorn/projects/rrl/rrl'$sub'/s'$ses'/fmri/mid'
+
+#convert anatomical scan to brick and header
+if ( -e anat+orig.HEAD ) then
+     	rm -rf anat+orig*
+endif
+# write this as 
+# if [ -e anat+orig.HEAD ]
+# > then
+# > rm -rf anat+orig*
+# > fi
+
+3dcopy 'rrl'$sub'_s'$ses'_t1.nii.gz' anat
+
+
+#cut the first 6 TRs (12 s) and the final 4 TRs (8 s)
+#291 total TRs
+#index 0
+#start 6
+#end 287
+3dTcat -prefix mid1 'mid_s'$ses'_1+orig[6..286]'
+3dTcat -prefix mid2 'mid_s'$ses'_2+orig[6..286]'
+
+#refitting + slice time correction
+3drefit -TR 2.0 mid1+orig.
+3drefit -TR 2.0 mid2+orig.
+if ( -e midts1+orig.HEAD ) then
+	rm -rf midts?+orig*
+endif
+
+3dTshift -slice 0 -tpattern altplus -prefix midts1 mid1+orig.
+3dTshift -slice 0 -tpattern altplus -prefix midts2 mid2+orig.
+
+rm -rf mid?+orig*
+
+#pre-clean 
+if( -e mid+orig.HEAD ) then
+	rm -rf mid+orig*
+endif
+
+#create concatenated dataset
+3dTcat -prefix mid midts1+orig midts2+orig
+rm -rf midts?+orig*
+
+#correct for motion
+if ( -e mid_m+orig.HEAD ) then
+	rm -rf mid_m+orig*
+endif 
+
+if (-e 3dmotionmid.1D ) then
+	rm -rf 3dmotionmid.1D
+endif
+
+3dvolreg -Fourier -twopass -prefix mid_m -base 3 -dfile 3dmotionmid.1D mid+orig
+
+#smooth spatially
+if ( -e mid_mb+orig.HEAD ) then
+	rm -rf mid_mb+orig*
+endif
+
+3dmerge -prefix mid_mb -1blur_fwhm 4 -doall mid_m+orig
+
+#normalize (calculate pct signal change / average) and filter
+if ( -e mid_mbn+orig.BRIK ) then
+	rm -rf mid_mbn+orig*
+endif
+
+if ( -e mid_ave+orig.BRIK ) then
+	rm -rf mid_ave+*
+endif
+
+3dTstat -prefix mid_ave 'mid_mb+orig[0..561]'
+3drefit -abuc mid_ave+orig
+3dcalc -datum float -a 'mid_mb+orig[0..561]' -b mid_ave+orig -expr "((a-b)/b)*100" -prefix mid_mbn
+
+if ( -e mid_mbnf+orig.HEAD ) then
+	rm -rf mid_mbnf+orig.*
+endif
+
+3dTproject -prefix mid_mbnf -stopband 0 .011 -input mid_mbn+orig
+
+#talairach warping
+#preclean directory
+if ( -e anat+tlrc.HEAD ) then
+	rm -rf anat+tlrc.*
+endif
+
+@auto_tlrc -warp_orig_vol -suffix NONE -base '/mnt/acorn/projects/rrl/masks/TT_N27+tlrc.' -input anat+orig.
+@auto_tlrc -warp_orig_vol -suffix mni -base '/mnt/acorn/projects/rrl/masks/mni_ns.nii.gz' -input anat+orig.
+
+#set the epi parent to the auto-warped anat
+3drefit -apar anat+orig mid_mbnf+orig
+
+cd /mnt/acorn/projects/rrl/scripts
+
