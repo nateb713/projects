@@ -1,0 +1,426 @@
+---
+title: "ICC_best"
+output: html_document
+date: "2024-02-20"
+---
+
+## Load in files and reshape data for session 1
+```{r}
+require('stringr')
+require('reshape2')
+
+#combine data frame
+subvec = c('rrl01','rrl02','rrl03','rrl04','rrl05','rrl06','rrl07',
+           'rrl10','rrl11','rrl12','rrl13','rrl14','rrl15','rrl16',
+           'rrl17','rrl18','rrl19','rrl20','rrl22','rrl23')
+
+d1 = data.frame()
+for (subj in 1:length(subvec)){
+  loadfilename = str_c('/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/',subvec[subj],'_ses1_tc10tr.csv')
+  d0 = read.csv(loadfilename, head=T)
+  d0$subject = subvec[subj]
+  d1 = rbind(d1,d0)
+}
+
+#any NAs?
+str(d1)
+d1$trialtype = as.numeric(d1$trialtype)
+d1$tr = as.numeric(d1$tr)
+d1[(1:37),'subject']
+
+write.csv(d1, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/20subj_ses1_tc10tr.csv', row.names=F)
+#write.csv(d1, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/20subj_ses1_tc10tr.csv', row.names=F)
+
+d.long = read.csv('/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/20subj_ses1_tc10tr.csv')
+
+#wide form
+d.melt = melt(d.long, measure.vars = c("lmid_mbnf_nacc8mm_mni_s1.1D",
+                                     "lmid_mbnf_nacc8mm_s1.1D",
+                                     "rmid_mbnf_nacc8mm_mni_s1.1D",
+                                     "rmid_mbnf_nacc8mm_s1.1D",
+                                     "bmid_mbnf_nacc8mm_mni_s1.1D",
+                                     "bmid_mbnf_nacc8mm_s1.1D"))
+
+d.w = dcast(d.melt, subject + tr + trialonset + trialtype + target_ms + rt + cue_value + hit + trial_gain +
+              total + iti + drift + total_winpercent + binned_winpercent ~ variable + TR, value.var = 'value')
+
+
+write.csv(d.w, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/20subj_ses1_tc10tr_wide.csv', row.names=F)
+
+
+```
+
+## Mean Activity Session 1
+```{r}
+# mean VOI activity mid task
+
+require(ggplot2)
+require(reshape2)
+require(extrafont)
+require(plyr)
+
+d.tc = read.csv('/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/20subj_ses1_tc10tr.csv')
+colnames(d.tc)
+
+
+#long form
+d.tc.melt = melt(d.tc, id=c('tr','trialtype','subject'),
+                 measure.vars = c("lmid_mbnf_nacc8mm_mni_s1.1D",
+                                     "lmid_mbnf_nacc8mm_s1.1D",
+                                     "rmid_mbnf_nacc8mm_mni_s1.1D",
+                                     "rmid_mbnf_nacc8mm_s1.1D",
+                                     "bmid_mbnf_nacc8mm_mni_s1.1D",
+                                     "bmid_mbnf_nacc8mm_s1.1D"))
+
+#summarize over TR and condition for each subject
+d.tc.subject = ddply(d.tc.melt, .variables = c('tr','trialtype','variable','subject'),
+                     summarise, mean.subject=mean(value))
+                     #sd.subject=sd(value)/sqrt(length(value)))
+
+d.tc.wide = dcast(d.tc.subject, subject ~ variable + trialtype + tr)
+
+write.csv(d.tc.wide, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/fMRI/mid_meanvoibold_rrl_s1.csv', row.names=F)
+
+```
+
+
+## Filtering Session 1
+```{r}
+# Filter relevant combinations of condition and TR
+relevant_conditions <- 3
+relevant_TRs <- c(3, 4)
+
+# Filter d.tc.wide
+d.tc.filtered <- d.tc.wide[d.tc.wide$trialtype %in% relevant_conditions & 
+                            (d.tc.wide$tr %in% relevant_TRs), ]
+
+# Filter d.w
+d.w.filtered <- d.w[d.w$trialtype %in% relevant_conditions & 
+                    (d.w$tr %in% relevant_TRs), ]
+
+# Write filtered data frames to CSV files
+write.csv(d.tc.filtered, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/filtered_d_tc_wide.csv', row.names = FALSE)
+write.csv(d.w.filtered, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/filtered_d_w.csv', row.names = FALSE)
+```
+
+
+## Load in files and reshape data for session 2
+```{r}
+require('stringr')
+require('reshape2')
+
+#combine data frame
+subvec2 = c('rrl01','rrl02','rrl03','rrl04','rrl05','rrl06','rrl07',
+           'rrl10','rrl11','rrl12','rrl13','rrl14','rrl15','rrl16',
+           'rrl17','rrl18','rrl19','rrl22','rrl23')
+
+d2 = data.frame()
+for (subj in 1:length(subvec2)){
+  loadfilename = str_c('/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/',subvec2[subj],'_ses2_tc10tr.csv')
+  d02 = read.csv(loadfilename, head=T)
+  d02$subject = subvec2[subj]
+  d2 = rbind(d2,d02)
+}
+
+#any NAs?
+str(d2)
+d2$trialtype = as.numeric(d2$trialtype)
+d2$tr = as.numeric(d2$tr)
+d2[(1:37),'subject']
+
+write.csv(d2, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/20subj_ses2_tc10tr.csv', row.names=F)
+
+
+d.long2 = read.csv('/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/20subj_ses2_tc10tr.csv')
+
+#wide form
+d.melt2 = melt(d.long2, measure.vars = c("lmid_mbnf_nacc8mm_mni_s2.1D",
+                                     "lmid_mbnf_nacc8mm_s2.1D",
+                                     "rmid_mbnf_nacc8mm_mni_s2.1D",
+                                     "rmid_mbnf_nacc8mm_s2.1D",
+                                     "bmid_mbnf_nacc8mm_mni_s2.1D",
+                                     "bmid_mbnf_nacc8mm_s2.1D"))
+
+d.w2 = dcast(d.melt2, subject + tr + trialonset + trialtype + target_ms + rt + cue_value + hit + trial_gain +
+              total + iti + drift + total_winpercent + binned_winpercent ~ variable + TR, fun.aggregate = mean, value.var = 'value')
+
+
+write.csv(d.w2, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/20subj_ses2_tc10tr_wide.csv', row.names=F)
+
+
+
+```
+
+## Mean Activity Session 2
+```{r}
+# mean VOI activity mid task
+
+require(ggplot2)
+require(reshape2)
+require(extrafont)
+require(plyr)
+
+d.tc2 = read.csv('/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/20subj_ses2_tc10tr.csv')
+colnames(d.tc2)
+
+
+#long form
+d.tc.melt2 = melt(d.tc2, id=c('tr','trialtype','subject'),
+                 measure.vars = c("lmid_mbnf_nacc8mm_mni_s2.1D",
+                                     "lmid_mbnf_nacc8mm_s2.1D",
+                                     "rmid_mbnf_nacc8mm_mni_s2.1D",
+                                     "rmid_mbnf_nacc8mm_s2.1D",
+                                     "bmid_mbnf_nacc8mm_mni_s2.1D",
+                                     "bmid_mbnf_nacc8mm_s2.1D"))
+
+#summarize over TR and condition for each subject
+d.tc.subject2 = ddply(d.tc.melt2, .variables = c('tr','trialtype','variable','subject'),
+                     summarise, mean.subject=mean(value))
+                     #sd.subject=sd(value)/sqrt(length(value)))
+
+d.tc.wide2 = dcast(d.tc.subject2, subject ~ variable + trialtype + tr)
+
+write.csv(d.tc.wide2, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/fMRI/mid_meanvoibold_rrl_s2.csv', row.names=F)
+
+```
+
+## Filtering Session 2
+```{r}
+# Filter relevant combinations of condition and TR
+relevant_conditions <- 3
+relevant_TRs <- c(3, 4)
+
+# Filter d.tc.wide
+d.tc.filtered2 <- d.tc.wide2[d.tc.wide2$trialtype %in% relevant_conditions & 
+                            (d.tc.wide2$tr %in% relevant_TRs), ]
+
+# Filter d.w
+d.w.filtered2 <- d.w2[d.w2$trialtype %in% relevant_conditions & 
+                    (d.w2$tr %in% relevant_TRs), ]
+
+# Write filtered data frames to CSV files
+write.csv(d.tc.filtered2, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/filtered_d_tc_wide_s2.csv', row.names = FALSE)
+write.csv(d.w.filtered2, '/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/filtered_d_w_s2.csv', row.names = FALSE)
+```
+
+## Clean
+```{r}
+# Read the file into a data frame
+d.w.filtered.clean <- read.csv('/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/filtered_d_w.csv')
+colnames(d.w.filtered.clean)
+
+# Select only the specific columns you need
+d.w.filtered.clean = d.w.filtered.clean[, c("subject", "tr", "trialtype", "lmid_mbnf_nacc8mm_mni_s1.1D_1", "lmid_mbnf_nacc8mm_s1.1D_1",    
+"rmid_mbnf_nacc8mm_mni_s1.1D_1", "rmid_mbnf_nacc8mm_s1.1D_1",    
+"bmid_mbnf_nacc8mm_mni_s1.1D_1", "bmid_mbnf_nacc8mm_s1.1D_1")]
+
+activity_columns = d.w.filtered.clean[, c("lmid_mbnf_nacc8mm_mni_s1.1D_1",
+                                        "lmid_mbnf_nacc8mm_s1.1D_1",
+                                        "rmid_mbnf_nacc8mm_mni_s1.1D_1",
+                                        "rmid_mbnf_nacc8mm_s1.1D_1",
+                                        "bmid_mbnf_nacc8mm_mni_s1.1D_1",
+                                        "bmid_mbnf_nacc8mm_s1.1D_1")]
+
+library(tidyverse)
+
+# Reshape the data to combine activity columns into a single column
+d.w.filtered.clean_long <- d.w.filtered.clean %>%
+  pivot_longer(cols = c("lmid_mbnf_nacc8mm_mni_s1.1D_1", 
+                        "lmid_mbnf_nacc8mm_s1.1D_1", 
+                        "rmid_mbnf_nacc8mm_mni_s1.1D_1", 
+                        "rmid_mbnf_nacc8mm_s1.1D_1", 
+                        "bmid_mbnf_nacc8mm_mni_s1.1D_1", 
+                        "bmid_mbnf_nacc8mm_s1.1D_1"),
+               names_to = "measurement",
+               values_to = "activity")
+
+# Calculate the mean fMRI activity for each combination of subject, trial type, and TR
+mean_activity_ses1 <- d.w.filtered.clean_long %>%
+  group_by(subject, trialtype, tr) %>%
+  summarize(mean_activity = mean(activity, na.rm = TRUE))
+
+
+
+# Read the file into a data frame
+d.w.filtered.clean2 <- read.csv('/Users/nathanielbouton/Documents/UArk/FAN Lab/Test-Retest/CSVs/filtered_d_w_s2.csv')
+colnames(d.w.filtered.clean2)
+
+# Select only the specific columns you need
+d.w.filtered.clean2 = d.w.filtered.clean2[, c("subject", "tr", "trialtype", "lmid_mbnf_nacc8mm_mni_s2.1D_1", "lmid_mbnf_nacc8mm_s2.1D_1",    
+"rmid_mbnf_nacc8mm_mni_s2.1D_1", "rmid_mbnf_nacc8mm_s2.1D_1",    
+"bmid_mbnf_nacc8mm_mni_s2.1D_1", "bmid_mbnf_nacc8mm_s2.1D_1")]
+
+activity_columns2 = d.w.filtered.clean2[, c("lmid_mbnf_nacc8mm_mni_s2.1D_1",
+                                        "lmid_mbnf_nacc8mm_s2.1D_1",
+                                        "rmid_mbnf_nacc8mm_mni_s2.1D_1",
+                                        "rmid_mbnf_nacc8mm_s2.1D_1",
+                                        "bmid_mbnf_nacc8mm_mni_s2.1D_1",
+                                        "bmid_mbnf_nacc8mm_s2.1D_1")]
+
+# Reshape the data to combine activity columns into a single column
+d.w.filtered.clean_long2 <- d.w.filtered.clean2 %>%
+  pivot_longer(cols = c("lmid_mbnf_nacc8mm_mni_s2.1D_1", 
+                        "lmid_mbnf_nacc8mm_s2.1D_1", 
+                        "rmid_mbnf_nacc8mm_mni_s2.1D_1", 
+                        "rmid_mbnf_nacc8mm_s2.1D_1", 
+                        "bmid_mbnf_nacc8mm_mni_s2.1D_1", 
+                        "bmid_mbnf_nacc8mm_s2.1D_1"),
+               names_to = "measurement",
+               values_to = "activity")
+
+# Calculate the mean fMRI activity for each combination of subject, trial type, and TR
+
+mean_activity <- d.w.filtered.clean_long %>%
+  group_by(subject, hemi, variable, trialtype, tr) %>%
+  summarize(mean_activity = mean(activity, na.rm = TRUE))
+
+
+mean_activity_ses2 <- d.w.filtered.clean_long2 %>%
+  group_by(subject, trialtype, tr) %>%
+  summarize(mean_activity = mean(activity, na.rm = TRUE))
+
+
+print(mean_activity_ses1)
+print(mean_activity_ses2)
+```
+
+## Plots
+```{r}
+# Load necessary library
+library(ggplot2)
+
+# Merge the two data frames by Subject
+#merged_data <- merge(mean_activity_ses1, mean_activity_ses2, by = "subject", suffixes = c("_session1", "_session2"))
+
+# Melt the data into long format for plotting
+#library(reshape2)
+#melted_data <- melt(merged_data, id.vars = merged_data$subject, measure.vars = c("mean_activity_session1", "mean_activity_session2"))
+
+# Create the rank order plot
+#ggplot(melted_data, aes(x = Subject, y = value, color = variable)) +
+  #geom_point() +  # Add points
+  #geom_line(aes(group = Subject)) +  # Connect points with lines
+  #labs(x = "Subject", y = "Mean Activity", color = "Session", title = "Mean Activity Comparison between Sessions")
+
+```
+
+## ICC between sessions 1 and 2
+```{r}
+# Load the necessary libraries
+#library(irr)
+
+# Define the combinations of trialtype and tr
+#conditions <- expand.grid(subject = unique(mean_activity_ses1$subject),
+                          #trialtype = 3,
+                          #tr = c(3, 4))
+
+# Initialize a list to store the ICC results
+#icc_results <- list()
+
+# Loop through the combinations
+#for (i in 1:nrow(conditions)) {
+  # Filter data for session 1
+  #ses1_subset <- subset(mean_activity_ses1, subject == conditions[i, "subject"] & 
+                          #trialtype == conditions[i, "trialtype"] &
+                          #tr == conditions[i, "tr"])
+  
+  # Filter data for session 2
+  #ses2_subset <- subset(mean_activity_ses2, subject == conditions[i, "subject"] & 
+                          #trialtype == conditions[i, "trialtype"] &
+                          #tr == conditions[i, "tr"])
+  
+  # Combine the subsets
+  #combined_subset <- data.frame(
+    #subject = rep(conditions[i, "subject"], times = nrow(ses1_subset)),
+    #mean_activity_session1 = ses1_subset$mean_activity,
+    #mean_activity_session2 = ses2_subset$mean_activity
+  #)
+  
+  # Compute ICC
+  #icc_result <- icc(combined_subset, model = "oneway", type = "consistency")
+  
+  # Store the ICC result
+  #icc_results[[i]] <- icc_result
+#}
+
+# Print the ICC results
+#for (i in 1:length(icc_results)) {
+ # cat("Subject:", conditions[i, "subject"], "Trialtype:", conditions[i, "trialtype"], "TR:", conditions[i, "tr"], "\n")
+  #print(icc_results[[i]])
+  #cat("\n")
+#}
+
+
+# Troubleshooting because of errors
+unique(mean_activity_ses1$mean_activity)
+class(mean_activity_ses1$mean_activity)
+trimws(mean_activity_ses1$mean_activity)
+trimws(mean_activity_ses2$mean_activity)
+
+as.numeric(mean_activity_ses1$mean_activity)
+as.numeric(mean_activity_ses2$mean_activity)
+
+as.logical(mean_activity_ses1$mean_activity)
+as.logical(mean_activity_ses2$mean_activity)
+
+mean_activity_ses1 = mean_activity_ses1[-35,]
+mean_activity_ses1 = mean_activity_ses1[-35,]
+```
+
+
+
+
+
+
+## New idea, combine values between the combinations of conditions.
+```{r}
+# Load the dplyr package
+library(dplyr)
+
+# Filter the data to include only tr values 3 and 4, then group by subject
+result <- mean_activity_ses1 %>%
+  filter(tr %in% c(3, 4)) %>%
+  group_by(subject) %>%
+  summarise(mean_activity = mean(mean_activity))
+
+# Print the result
+print(result)
+
+# Filter the data to include only tr values 3 and 4, then group by subject
+result2 <- mean_activity_ses2 %>%
+  filter(tr %in% c(3, 4)) %>%
+  group_by(subject) %>%
+  summarise(mean_activity = mean(mean_activity))
+
+# Print the result
+print(result)
+
+
+result_merge <- merge(result, result2, by = "subject", suffixes = c("_session1", "_session2"))
+
+# Load required libraries
+library(irr) # For ICC calculation
+library(ggplot2) # For plotting
+
+
+
+# Calculate ICC
+icc_result <- icc(result_merge[, c("mean_activity_session1", "mean_activity_session2")])
+
+# Print ICC result
+print(icc_result)
+
+```
+
+
+## New idea plots
+```{r}
+# Melt the data into long format for plotting
+melt_results <- melt(result_merge, id.vars = "subject", measure.vars = c("mean_activity_session1", "mean_activity_session2"))
+
+# Create the rank order plot
+ggplot(melt_results, aes(x = subject, y = value, color = variable, group = variable)) +
+  geom_point() +  # Add points
+  geom_line() +  # Connect points with lines
+  labs(x = "Subject", y = "Mean Activity", color = "Session", title = "Mean Activity Comparison between Sessions")
+```

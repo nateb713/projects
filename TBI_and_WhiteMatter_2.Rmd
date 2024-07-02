@@ -1,0 +1,212 @@
+---
+title: "Injury/Non-Injury Comparison"
+output:
+  html_document: default
+  pdf_document: default
+date: "2024-01-17"
+---
+
+## Install/load packages and load in data 
+``` {r}
+library(tidyverse)
+library(knitr)
+library(dplyr)
+library(ggplot2)
+library(broom)
+library(purrr)
+tbi <- read_delim('/Users/nathanielbouton/Documents/UArk/FAN Lab/DD project/abcd txt files/abcd_tbi01.txt')
+tbi = tbi[-1, ]
+
+wm1 <- read.table('/Users/nathanielbouton/Documents/UArk/FAN Lab/DD project/abcd txt files/abcd_dmdtifp101.txt', head = T)
+wm1 = wm1[-1, ]
+```
+
+## Add columns, remove columns not needed, and filter
+```{r}
+tbi <- tbi %>%
+  mutate(group = ifelse(tbi_ss_ntbiloc == 1, "inj", "noinj"))
+# "inj" is a subject with 1 tbi with loss of consciousness
+
+tbi <- tbi %>%
+  select(subjectkey, interview_age, sex, eventname, group)
+
+tbi <- tbi %>%
+  filter(eventname == "baseline_year_1_arm_1")
+
+wm1 <- wm1 %>%
+  select(subjectkey, eventname, dmdtifp1_3,
+         dmdtifp1_4, dmdtifp1_13, dmdtifp1_14, dmdtifp1_19,
+         dmdtifp1_45, dmdtifp1_46, dmdtifp1_55, dmdtifp1_56,
+         dmdtifp1_61)
+
+wm1 <- wm1 %>%
+  filter(eventname == "baseline_year_1_arm_1")
+
+```
+
+## Merge tbi data with white matter files and edit column names
+``` {r}
+tbi_wm <- merge(tbi, wm1, by = "subjectkey", all = TRUE)
+
+colnames(tbi_wm) <- c("Subjectkey", "Interview_age", "Sex", "Eventname_tbi","Group",
+                              "Eventname_mri",
+                              "FA_right_cingulate_cingulum",
+                              "FA_left_cingulate_cingulum",
+                              "FA_right_ILF",
+                              "FA_left_ILF",
+                              "FA_corpus_callosum",
+                              "MD_right_cingulate_cingulum",
+                              "MD_left_cingulate_cingulum",
+                              "MD_right_ILF",
+                              "MD_left_ILF",
+                              "MD_corpus_callosum")
+```
+
+
+## Balance group sizes
+``` {r}
+# Calculate the minimum number of subjects for each group
+min_subjects <- min(table(tbi_wm$Group))
+
+# Balance the groups for equal numbers of subjects
+tbi_wm <- tbi_wm %>%
+  group_by(Group) %>%
+  sample_n(min_subjects, replace = TRUE)
+
+# Balance the gender within each group
+tbi_wm <- tbi_wm %>%
+  group_by(Group, Sex) %>%
+  sample_n(min_subjects, replace = TRUE)
+
+# Reset row names
+rownames(tbi_wm) <- NULL
+
+gender_distribution <- table(tbi_wm$Group, tbi_wm$Sex)
+total_count <- table(tbi_wm$Group)
+print(gender_distribution)
+print(total_count)
+
+```
+
+## Remove NAs, remove rows with no diffusion data, and make table.
+```{r}
+tbi_wm = na.omit(tbi_wm)
+
+rows_with_missing <- tbi_wm[rowSums(is.na(tbi_wm) | tbi_wm == "") > 0, ]
+tbi_wm <- anti_join(tbi_wm, rows_with_missing)
+
+tbi_wm[, 2] <- lapply(tbi_wm[, 2], as.numeric)
+tbi_wm[, 7:16] <- lapply(tbi_wm[, 7:16], as.numeric)
+
+summary_table <- tbi_wm %>%
+  summarise(
+    Total_Subjects = n(),
+    Mean_Age = mean(Interview_age, na.rm = TRUE),
+    SD_Age = sd(Interview_age, na.rm = TRUE),
+    Male_Count = sum(Sex == "M", na.rm = TRUE),
+    Female_Count = sum(Sex == "F", na.rm = TRUE),
+    Group1_Count = sum(Group == "inj", na.rm = TRUE),
+    Group2_Count = sum(Group == "noinj", na.rm = TRUE),
+    Mean_FA_R_Cingulum = mean(FA_right_cingulate_cingulum, na.rm = TRUE),
+    SD_FA_R_Cingulum = sd(FA_right_cingulate_cingulum, na.rm = TRUE),
+    Mean_FA_L_Cingulum = mean(FA_left_cingulate_cingulum, na.rm = TRUE),
+    SD_FA_L_Cingulum = sd(FA_left_cingulate_cingulum, na.rm = TRUE),
+    Mean_FA_R_ILF = mean(FA_right_ILF, na.rm = TRUE),
+    SD_FA_R_ILF = sd(FA_right_ILF, na.rm = TRUE),
+    Mean_FA_L_ILF = mean(FA_left_ILF, na.rm = TRUE),
+    SD_FA_L_ILF = sd(FA_left_ILF, na.rm = TRUE),
+    Mean_FA_Corpus_Callosum = mean(FA_corpus_callosum, na.rm = TRUE),
+    SD_FA_Corpus_Callosum = sd(FA_corpus_callosum, na.rm = TRUE),
+    Mean_MD_R_Cingulum = mean(MD_right_cingulate_cingulum, na.rm = TRUE),
+    SD_MD_R_Cingulum = sd(MD_right_cingulate_cingulum, na.rm = TRUE),
+    Mean_MD_L_Cingulum = mean(MD_left_cingulate_cingulum, na.rm = TRUE),
+    SD_MD_L_Cingulum = sd(MD_left_cingulate_cingulum, na.rm = TRUE),
+    Mean_MD_R_ILF = mean(MD_right_ILF, na.rm = TRUE),
+    SD_MD_R_ILF = sd(MD_right_ILF, na.rm = TRUE),
+    Mean_MD_L_ILF = mean(MD_left_ILF, na.rm = TRUE),
+    SD_MD_L_ILF = sd(MD_left_ILF, na.rm = TRUE),
+    Mean_MD_Corpus_Callosum = mean(MD_corpus_callosum, na.rm = TRUE),
+    SD_MDCorpus_Callosum = sd(MD_corpus_callosum, na.rm = TRUE)
+)
+
+print(summary_table)
+```
+
+
+## Plots
+``` {r}
+ggplot(tbi_wm, aes(x = FA_right_cingulate_cingulum, 
+  fill = Group)) +geom_histogram(position = "identity",alpha = 0.7, bins = 30) +
+  labs(title = "FA_right_cingulate_cingulum", x = "FA_Values",
+       y = "Frequency") + theme_minimal() + facet_grid(. ~ Sex)
+
+ggplot(tbi_wm, aes(x = FA_left_cingulate_cingulum, 
+  fill = Group)) +geom_histogram(position = "identity",alpha = 0.7, bins = 30) +
+  labs(title = "FA_left_cingulate_cingulum", x = "FA_Values",
+       y = "Frequency") + theme_minimal() + facet_grid(. ~ Sex)
+
+ggplot(tbi_wm, aes(x = FA_right_ILF, 
+  fill = Group)) +geom_histogram(position = "identity",alpha = 0.7, bins = 30) +
+  labs(title = "FA_right_ILF", x = "FA_Values", y = "Frequency") +
+  theme_minimal() + facet_grid(. ~ Sex)
+
+ggplot(tbi_wm, aes(x = FA_left_ILF, 
+  fill = Group)) +geom_histogram(position = "identity",alpha = 0.7, bins = 30) +
+  labs(title = "FA_left_ILF", x = "FA_Values", y = "Frequency") +
+  theme_minimal() + facet_grid(. ~ Sex)
+
+ggplot(tbi_wm, aes(x = FA_corpus_callosum, 
+  fill = Group)) +geom_histogram(position = "identity",alpha = 0.7, bins = 30) +
+  labs(title = "FA_corpus_callosum", x = "FA_Values",
+       y = "Frequency") + theme_minimal() + facet_grid(. ~ Sex)
+
+ggplot(tbi_wm, aes(x = MD_right_cingulate_cingulum, 
+  fill = Group)) +geom_histogram(position = "identity",alpha = 0.7, bins = 30) +
+  labs(title = "MD_right_cingulate_cingulum", x = "MD_Values",
+       y = "Frequency") + theme_minimal() + facet_grid(. ~ Sex)
+
+ggplot(tbi_wm, aes(x = MD_left_cingulate_cingulum, 
+  fill = Group)) +geom_histogram(position = "identity",alpha = 0.7, bins = 30) +
+  labs(title = "MD_left_cingulate_cingulum", x = "MD_Values",
+       y = "Frequency") + theme_minimal() + facet_grid(. ~ Sex)
+
+ggplot(tbi_wm, aes(x = MD_right_ILF, 
+  fill = Group)) +geom_histogram(position = "identity",alpha = 0.7, bins = 30) +
+  labs(title = "MD_right_ILF", x = "MD_Values", y = "Frequency") +
+  theme_minimal() + facet_grid(. ~ Sex)
+
+ggplot(tbi_wm, aes(x = MD_left_ILF, 
+  fill = Group)) +geom_histogram(position = "identity",alpha = 0.7, bins = 30) +
+  labs(title = "MD_left_ILF", x = "MD_Values", y = "Frequency") +
+  theme_minimal() + facet_grid(. ~ Sex)
+
+ggplot(tbi_wm, aes(x = MD_corpus_callosum, 
+  fill = Group)) +geom_histogram(position = "identity",alpha = 0.7, bins = 30) +
+  labs(title = "MD_corpus_callosum", x = "MD_Values",
+       y = "Frequency") + theme_minimal() + facet_grid(. ~ Sex)
+
+```
+
+## Stats
+``` {r}
+# Define your lists of metrics
+FA_metrics <- colnames(tbi_wm)[7:11]
+MD_metrics <- colnames(tbi_wm)[12:16]
+
+# Perform t-test for each MRI metric
+all_metrics <- c(FA_metrics, MD_metrics)
+
+for (metric in all_metrics) {
+  # Perform t-test for group differences
+  group_t_test <- t.test(as.formula(paste(metric, " ~ Group")), data = tbi_wm)
+  print(paste("T-test for", metric, "and Group"))
+  print(group_t_test)
+  
+  # Perform t-test for sex differences
+  sex_t_test <- t.test(as.formula(paste(metric, " ~ Sex")), data = tbi_wm)
+  print(paste("T-test for", metric, "and Sex"))
+  print(sex_t_test)
+}
+
+```
+
