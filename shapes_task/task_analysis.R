@@ -67,7 +67,7 @@ with(d, t.test(dprimeOldNewWithNewNew, dprimeNewOldWithNewNew, paired=T)) # show
 
 
 
-# Add this to your existing R script to create visualizations
+# create visualizations
 
 library(ggplot2)
 library(dplyr)
